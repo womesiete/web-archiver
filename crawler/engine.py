@@ -22,7 +22,7 @@ from crawler.asset_manager import AssetManager
 from crawler.singlefile_bridge import capture_with_singlefile
 from crawler import capture as capture_backend
 from crawler import postprocess
-from utils.link_utils import normalize_url, is_internal, is_crawlable_scheme
+from utils.link_utils import normalize_url, is_within_scope, is_crawlable_scheme
 from utils import paths
 
 
@@ -216,10 +216,14 @@ class CrawlEngine(QObject):
 			for link_url, link_text in links:
 				if not is_crawlable_scheme(link_url):
 					continue
-				if is_internal(link_url, self.config.base_url):
+				if is_within_scope(link_url, self.config.base_url, self.config.restrict_to_path):
 					if depth < self.config.max_depth:
 						self.db.add_page(link_url, depth + 1)
 				else:
+					# Either a different host, or (when restrict_to_path is
+					# enabled) the same host but outside the Base URL's
+					# directory - both are logged and left as live links
+					# rather than downloaded.
 					self.db.add_external_link(link_url, url, link_text)
 
 			self.db.mark_completed(page_id, str(local_path), title)

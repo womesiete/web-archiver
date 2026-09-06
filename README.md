@@ -35,8 +35,15 @@ python3 main.py
 4. **Max Asset Size** — images/media/fonts/scripts/stylesheets larger than
    this are skipped locally and left pointing at their live URL.
 5. **Human Jitter** — random delay range (seconds) between page requests.
-6. **Headless / Auto-Scroll** — run Chromium invisibly, and/or scroll each
-   page before capture to trigger lazy-loaded content.
+6. **Headless / Auto-Scroll / Stay within Base URL path** — run Chromium
+   invisibly, scroll each page before capture to trigger lazy-loaded
+   content, and (on by default) keep the crawl inside the Base URL's own
+   folder. With scoping on, a same-site link that leads *outside* that
+   folder — e.g. a wiki page linking back to the site's homepage — is
+   treated like an external link (logged, left live) instead of being
+   crawled, so archiving one section of a large site doesn't quietly
+   balloon into crawling the whole domain. Uncheck it to crawl the entire
+   domain regardless of the Base URL's path.
 7. **Manual Login / Auth Setup** — opens a visible browser window using the
    same persistent profile (`./browser_profile`) the crawler uses, so you can
    log in or solve a CAPTCHA by hand; cookies/storage are then inherited

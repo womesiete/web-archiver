@@ -27,6 +27,7 @@ class CrawlConfig:
 	jitter_max: float = 5.0
 	headless: bool = True
 	auto_scroll: bool = True
+	restrict_to_path: bool = True
 	profile_dir: Path = Path("./browser_profile")
 
 	def __post_init__(self):
@@ -51,3 +52,8 @@ DEFAULT_USER_AGENTS = [
 # Well-known filenames written inside every output folder.
 DB_FILENAME = "crawl_state.db"
 REPORT_FILENAME = "completion_report.html"
+
+# Identifies this app's QSettings backing store (Windows Registry key,
+# macOS plist, or ~/.config/<ORG_NAME>/<APP_NAME>.conf on Linux).
+ORG_NAME = "OfflineArchiverApp"
+APP_NAME = "WebArchiver"

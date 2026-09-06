@@ -93,7 +93,7 @@ def generate_report(db, output_path: Path) -> Path:
 <h2>Internal Pages Captured</h2>
 {pages_table}
 
-<h2>External Links (kept live)</h2>
+<h2>External / Out-of-Scope Links (kept live)</h2>
 {external_table}
 
 <h2>Assets Skipped for Exceeding Size Limit</h2>

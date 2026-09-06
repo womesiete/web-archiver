@@ -14,6 +14,8 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 
+from PyQt6.QtCore import QSettings
+from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
 	QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QPushButton,
 	QSpinBox, QDoubleSpinBox, QCheckBox, QProgressBar, QPlainTextEdit,
@@ -42,7 +44,13 @@ class MainWindow(QWidget):
 		self.db: Optional[CrawlDatabase] = None
 		self._crawl_task: Optional[asyncio.Task] = None
 
+		# QSettings() with no arguments uses the organization/application
+		# name registered on QApplication in main.py to find its backing
+		# store (Registry / plist / INI file) automatically.
+		self.settings = QSettings()
+
 		self._build_ui()
+		self._load_settings()
 
 	# ------------------------------------------------------------------ #
 	# UI construction
@@ -95,8 +103,17 @@ class MainWindow(QWidget):
 		self.headless_check.setChecked(True)
 		self.autoscroll_check = QCheckBox("Auto-Scroll")
 		self.autoscroll_check.setChecked(True)
+		self.restrict_scope_check = QCheckBox("Stay within Base URL path")
+		self.restrict_scope_check.setChecked(True)
+		self.restrict_scope_check.setToolTip(
+			"When checked, same-site links that lead outside the Base URL's own\n"
+			"folder (e.g. a wiki page linking back to the site's homepage) are\n"
+			"treated like external links - logged and left live, not crawled.\n"
+			"Uncheck to crawl the entire domain regardless of the Base URL's path."
+		)
 		toggle_row.addWidget(self.headless_check)
 		toggle_row.addWidget(self.autoscroll_check)
+		toggle_row.addWidget(self.restrict_scope_check)
 		form.addRow("Options:", toggle_row)
 
 		form_box.setLayout(form)
@@ -153,6 +170,7 @@ class MainWindow(QWidget):
 			jitter_max=self.jitter_max_spin.value(),
 			headless=self.headless_check.isChecked(),
 			auto_scroll=self.autoscroll_check.isChecked(),
+			restrict_to_path=self.restrict_scope_check.isChecked(),
 		)
 
 	def _set_controls_running(self, running: bool) -> None:
@@ -162,9 +180,63 @@ class MainWindow(QWidget):
 		for widget in (
 			self.base_url_input, self.output_dir_input, self.depth_spin,
 			self.max_size_spin, self.jitter_min_spin, self.jitter_max_spin,
-			self.headless_check, self.autoscroll_check,
+			self.headless_check, self.autoscroll_check, self.restrict_scope_check,
 		):
 			widget.setEnabled(not running)
+
+	# ------------------------------------------------------------------ #
+	# Settings persistence (QSettings)
+	# ------------------------------------------------------------------ #
+
+	def _load_settings(self) -> None:
+		"""Populate every form field from the last saved session, if any.
+		Each read supplies the widget's current (default) value as a
+		fallback, so first-run behaves exactly as if this method didn't
+		exist."""
+		s = self.settings
+		self.base_url_input.setText(s.value("crawl/base_url", self.base_url_input.text(), type=str))
+		self.output_dir_input.setText(s.value("crawl/output_dir", self.output_dir_input.text(), type=str))
+		self.depth_spin.setValue(s.value("crawl/max_depth", self.depth_spin.value(), type=int))
+		self.max_size_spin.setValue(s.value("crawl/max_file_size_mb", self.max_size_spin.value(), type=float))
+		self.jitter_min_spin.setValue(s.value("crawl/jitter_min", self.jitter_min_spin.value(), type=float))
+		self.jitter_max_spin.setValue(s.value("crawl/jitter_max", self.jitter_max_spin.value(), type=float))
+		self.headless_check.setChecked(s.value("crawl/headless", self.headless_check.isChecked(), type=bool))
+		self.autoscroll_check.setChecked(s.value("crawl/auto_scroll", self.autoscroll_check.isChecked(), type=bool))
+		self.restrict_scope_check.setChecked(
+			s.value("crawl/restrict_to_path", self.restrict_scope_check.isChecked(), type=bool)
+		)
+
+		# Bonus: remember window size/position too, since it's effectively
+		# free once QSettings is already wired up.
+		geometry = s.value("window/geometry")
+		if geometry is not None:
+			self.restoreGeometry(geometry)
+
+	def _save_settings(self) -> None:
+		"""Persist every form field so the next launch starts where this
+		session left off."""
+		s = self.settings
+		s.setValue("crawl/base_url", self.base_url_input.text())
+		s.setValue("crawl/output_dir", self.output_dir_input.text())
+		s.setValue("crawl/max_depth", self.depth_spin.value())
+		s.setValue("crawl/max_file_size_mb", self.max_size_spin.value())
+		s.setValue("crawl/jitter_min", self.jitter_min_spin.value())
+		s.setValue("crawl/jitter_max", self.jitter_max_spin.value())
+		s.setValue("crawl/headless", self.headless_check.isChecked())
+		s.setValue("crawl/auto_scroll", self.autoscroll_check.isChecked())
+		s.setValue("crawl/restrict_to_path", self.restrict_scope_check.isChecked())
+		s.setValue("window/geometry", self.saveGeometry())
+		# Force an immediate flush to disk/registry rather than waiting for
+		# Qt's normal (deferred) sync, in case the process is killed abruptly
+		# right after this call (e.g. Stop Crawl -> close window quickly).
+		s.sync()
+
+	def closeEvent(self, event: QCloseEvent) -> None:
+		"""Persist settings whenever the window closes, not just when the
+		user presses Start Crawl, so tweaks made without starting a crawl
+		aren't lost."""
+		self._save_settings()
+		super().closeEvent(event)
 
 	# ------------------------------------------------------------------ #
 	# Button handlers
@@ -179,6 +251,10 @@ class MainWindow(QWidget):
 		if not self.output_dir_input.text().strip():
 			QMessageBox.warning(self, "Missing Output Folder", "Please choose an output folder.")
 			return
+
+		# Persist now (not just on window close) so settings used for this
+		# crawl survive even if the app is force-quit while it's running.
+		self._save_settings()
 
 		try:
 			config.output_dir.mkdir(parents=True, exist_ok=True)
