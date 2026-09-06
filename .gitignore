@@ -1,0 +1,39 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Virtual environments ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Playwright / browser profile ---
+# The persistent auth profile holds real session cookies - never commit it.
+browser_profile/
+.playwright/
+
+# --- App runtime output (crawl results are user data, not source) ---
+archive_output/
+output/
+*.db
+crawl_state.db
+completion_report.html
+site/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
